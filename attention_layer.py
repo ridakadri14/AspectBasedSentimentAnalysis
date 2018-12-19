@@ -1,11 +1,5 @@
-# -*- coding: utf-8 -*-
-# file: attention_layer.py
-# author: songyouwei <youwei0314@gmail.com>
-# Copyright (C) 2018. All Rights Reserved.
-
 from tensorflow.python.keras import backend as K
 from tensorflow.python.keras.layers import Layer
-import tensorflow as tf
 
 class Attention(Layer):
     def __init__(self, score_function='scaled_dot_product', initializer='glorot_normal', regularizer=None, **kwargs):
@@ -16,13 +10,9 @@ class Attention(Layer):
         super(Attention, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        
-        
-        print(input_shape)
         self.EMBED_DIM = input_shape[0][-1].value
         K_LEN = input_shape[0][1].value
         Q_LEN = input_shape[1][1].value if input_shape[1].ndims == 3 else 1
-        
 
         if self.score_function == 'mlp':
             self.W1 = self.add_weight(name="W1_{:s}".format(self.name),
@@ -43,19 +33,12 @@ class Attention(Layer):
                                         trainable=True)
 
         super(Attention, self).build(input_shape)
-        
-    def compute_mask(self, input_tensor, mask=None):
-        
-        return None
 
     def call(self, inputs, mask=None):
         # output = softmax(score)
         k, q = inputs
-        
         if len(q.shape) == 2:
             q = K.expand_dims(q, axis=1)
-        
-        
         # k: (?, K_LEN, EMBED_DIM,)
         # q: (?, Q_LEN, EMBED_DIM,)
         # score: (?, Q_LEN, K_LEN,)
@@ -74,18 +57,14 @@ class Attention(Layer):
         else:
             raise RuntimeError('invalid score_function')
         score = K.softmax(score)
-        if mask is not None:
-            score *= K.cast(mask[0], K.floatx())
+#        if mask is not None:
+#            score *= K.cast(mask, K.floatx())
         # output: (?, Q_LEN, EMBED_DIM,)
         output = K.batch_dot(score, k)
-        
-#        print(tf.rank(output))
-#        print("output",output.shape)
-        
-#        shape =  tf.shape(q)
-        
         return output
-        
+    
+    def compute_mask(self, input_tensor, mask=None):
+        return None
 
     def compute_output_shape(self, input_shape):
         # (?, Q_LEN, EMBED_DIM,)

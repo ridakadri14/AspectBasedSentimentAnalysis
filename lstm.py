@@ -1,7 +1,6 @@
 from __future__ import print_function
 import argparse
 import os
-import pickle
 from tensorflow.python.keras.callbacks import TensorBoard, LambdaCallback
 # from tensorflow.python.keras.utils import plot_model
 from utils import read_dataset
@@ -39,8 +38,8 @@ class RecurrentAttentionMemory:
         }
         self.MAX_SEQUENCE_LENGTH = 80
         self.MAX_ASPECT_LENGTH = 10
-        self.BATCH_SIZE = 8
-        self.EPOCHS = 5
+        self.BATCH_SIZE = 32
+        self.EPOCHS = 50
 
         self.texts_raw_indices, self.texts_raw_without_aspects_indices, self.texts_left_indices, self.texts_left_with_aspects_indices, \
         self.aspects_indices, self.texts_right_indices, self.texts_right_with_aspects_indices, \
@@ -75,17 +74,13 @@ class RecurrentAttentionMemory:
             memory = Bidirectional(LSTM(return_sequences=True, **self.LSTM_PARAMS), name='memory')(sentence)
             aspect = Bidirectional(LSTM(return_sequences=True, **self.LSTM_PARAMS), name='aspect')(aspect)
             x = Lambda(lambda xin: K.sum(xin[0], axis=1) / xin[1], name='aspect_mean')([aspect, nonzero_count])
-            print("before",x.shape)
             shared_attention = Attention(score_function=self.SCORE_FUNCTION,
                                          initializer=self.INITIALIZER, regularizer=self.REGULARIZER,
                                          name='shared_attention')
             for i in range(self.HOPS):
                 x = shared_attention((memory, x))
             x = Flatten()(x)
-            print(x.shape.ndims)
-            if(x.shape[1] != None):
-                x = Dense(self.POLARITIES_DIM)(x)
-            print(x.shape)
+            x = Dense(self.POLARITIES_DIM)(x)
             predictions = Activation('softmax')(x)
             model = Model(inputs=[inputs_sentence, inputs_aspect], outputs=predictions)
             model.summary()
@@ -94,9 +89,10 @@ class RecurrentAttentionMemory:
             self.model = model
 
     def train(self):
+        tbCallBack = TensorBoard(log_dir='./ram_logs', histogram_freq=0, write_graph=True, write_images=True)
         def modelSave(epoch, logs):
             if (epoch + 1) % 5 == 0:
-                self.model.save('ram_saved_model.h5')
+                self.model.save('lstm_saved_model.h5')
         msCallBack = LambdaCallback(on_epoch_end=modelSave)
 
         texts_raw_indices, texts_raw_without_aspects_indices, texts_left_indices, texts_left_with_aspects_indices, \
@@ -108,9 +104,8 @@ class RecurrentAttentionMemory:
                          max_seq_len=self.MAX_SEQUENCE_LENGTH, max_aspect_len=self.MAX_ASPECT_LENGTH)
 
         self.model.fit([self.texts_raw_indices, self.aspects_indices], self.polarities_matrix,
-                       epochs=self.EPOCHS, batch_size=self.BATCH_SIZE)
-        filename = 'finalized_model.sav'
-        pickle.dump(model, open(filename, 'wb'))
+                       validation_data=([texts_raw_indices, aspects_indices], polarities_matrix),
+                       epochs=self.EPOCHS, batch_size=self.BATCH_SIZE,callbacks=[msCallBack])
 
 
 if __name__ == '__main__':
