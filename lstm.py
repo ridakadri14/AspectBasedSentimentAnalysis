@@ -13,11 +13,12 @@ from tensorflow.python.keras.models import Model, load_model
 from tensorflow.python.keras.layers import Input, Dense, Activation, LSTM, Embedding, Bidirectional, Lambda, Flatten
 
 
+
 class RecurrentAttentionMemory:
     def __init__(self):
-        self.HOPS = 5
+        self.HOPS = 3
         self.SCORE_FUNCTION = 'mlp'  # scaled_dot_product / mlp (concat) / bi_linear (general dot)
-        self.DATASET = 'restaurant'  # 'twitter', 'restaurant', 'laptop'
+        self.DATASET = 'twitter'  # 'twitter', 'restaurant', 'laptop'
         self.POLARITIES_DIM = 3
         self.EMBEDDING_DIM = 300
         self.LEARNING_RATE = 0.001
@@ -39,7 +40,7 @@ class RecurrentAttentionMemory:
         self.MAX_SEQUENCE_LENGTH = 80
         self.MAX_ASPECT_LENGTH = 10
         self.BATCH_SIZE = 32
-        self.EPOCHS = 50
+        self.EPOCHS = 5
 
         self.texts_raw_indices, self.texts_raw_without_aspects_indices, self.texts_left_indices, self.texts_left_with_aspects_indices, \
         self.aspects_indices, self.texts_right_indices, self.texts_right_with_aspects_indices, \
@@ -89,7 +90,7 @@ class RecurrentAttentionMemory:
             self.model = model
 
     def train(self):
-        tbCallBack = TensorBoard(log_dir='./ram_logs', histogram_freq=0, write_graph=True, write_images=True)
+#        tbCallBack = TensorBoard(log_dir='./ram_logs', histogram_freq=0, write_graph=True, write_images=True)
         def modelSave(epoch, logs):
             if (epoch + 1) % 5 == 0:
                 self.model.save('lstm_saved_model.h5')
@@ -104,8 +105,9 @@ class RecurrentAttentionMemory:
                          max_seq_len=self.MAX_SEQUENCE_LENGTH, max_aspect_len=self.MAX_ASPECT_LENGTH)
 
         self.model.fit([self.texts_raw_indices, self.aspects_indices], self.polarities_matrix,
-                       validation_data=([texts_raw_indices, aspects_indices], polarities_matrix),
                        epochs=self.EPOCHS, batch_size=self.BATCH_SIZE,callbacks=[msCallBack])
+        scores =  self.model.evaluate([texts_raw_indices, aspects_indices], polarities_matrix, verbose=0)
+        print("Loss :", scores[0], "Accuracy", scores[1]*100)
 
 
 if __name__ == '__main__':
